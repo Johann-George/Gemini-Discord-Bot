@@ -33,10 +33,40 @@ client.on('messageCreate', async (message)=>{
         const command = message.content.slice(prefix.length).trim().split(/ +/).shift().toLowerCase();
         if(command==='explain'){
             const {response}=await model.generateContent(message.cleanContent)
+            const text = response.text(); // Assuming response.text() is the text you want to send
+            const textChunks = splitIntoChunks(text, MAX_LENGTH);
 
+            for (const chunk of textChunks) {
             await message.reply({
-                content:response.text(),
+                content: chunk,
             });
+            }
+        }
+        if(command==='factcheck'){
+            const factToCheck = message.content.slice('!factcheck'.length).trim();
+            const prompt = `You are a fact checker bot. Could you check whether this fact is true? "${factToCheck}"`;
+
+            try {
+                // Send the prompt to the AI API
+                const response = await axios.post(AI_API_URL, {
+                prompt: prompt,
+                max_tokens: 50, // Customize based on how long of a response you want
+                // Other parameters as required by the AI service
+                }, {
+                headers: {
+                    'Authorization': `Bearer ${API_KEY}`,
+                },
+                });
+
+                // Assuming the response contains a field `data` with the AI's text response
+                const aiResponse = response.data.data;
+
+                // Send the result to the Discord channel
+                message.reply(`Fact Check Result: ${aiResponse}`);
+            } catch (error) {
+                console.error(error);
+                message.reply('An error occurred while trying to fact-check the statement.');
+            }
         }
         
     }
@@ -44,3 +74,16 @@ client.on('messageCreate', async (message)=>{
         console.log(e);
     }
 })
+
+const MAX_LENGTH = 2000; // Discord's max length for messages
+
+// Helper function to split text into chunks
+function splitIntoChunks(text, maxLength) {
+  const chunks = [];
+  while (text.length > 0) {
+    const chunk = text.slice(0, maxLength);
+    chunks.push(chunk);
+    text = text.slice(maxLength);
+  }
+  return chunks;
+}
